@@ -7,19 +7,18 @@ interface SkillSelectorProps {
   label: string;
 }
 
-export const SkillSelector = ({ control, name, label }: SkillSelectorProps) => {
-  // This would typically come from an API or context
-  const availableSkills = [
-    { label: 'JavaScript', value: 'javascript' },
-    { label: 'TypeScript', value: 'typescript' },
-    { label: 'React', value: 'react' },
-    { label: 'Node.js', value: 'nodejs' },
-    { label: 'Python', value: 'python' },
-    { label: 'Java', value: 'java' },
-    { label: 'SQL', value: 'sql' },
-    { label: 'MongoDB', value: 'mongodb' },
-  ];
+const skillOptions = [
+  { label: 'React', value: 'react' },
+  { label: 'Node.js', value: 'nodejs' },
+  { label: 'TypeScript', value: 'typescript' },
+  { label: 'Python', value: 'python' },
+  { label: 'Java', value: 'java' },
+  { label: 'Docker', value: 'docker' },
+  { label: 'AWS', value: 'aws' },
+  // Add more skills as needed
+];
 
+export const SkillSelector = ({ control, name, label }: SkillSelectorProps) => {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700">
@@ -28,14 +27,19 @@ export const SkillSelector = ({ control, name, label }: SkillSelectorProps) => {
       <Controller
         control={control}
         name={name}
-        render={({ field: { onChange, value } }) => (
-          <MultiSelect
-            options={availableSkills}
-            value={value || []}
-            onChange={onChange}
-            labelledBy="Select skills"
-            className="mt-1"
-          />
+        render={({ field: { onChange, value }, fieldState: { error } }) => (
+          <>
+            <MultiSelect
+              options={skillOptions}
+              value={value || []}
+              onChange={onChange}
+              labelledBy={label}
+              className="mt-1"
+            />
+            {error && (
+              <p className="mt-1 text-sm text-red-600">{error.message}</p>
+            )}
+          </>
         )}
       />
     </div>

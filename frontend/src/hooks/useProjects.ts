@@ -5,14 +5,17 @@ interface Project {
   id: string;
   title: string;
   description: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'COMPLETED';
-  requiredSkills: string[];
-  currentMembers: number;
-  maxMembers: number;
+  status: string;
+  skills: string[];
   timeline: {
-    startDate: string;
-    endDate: string;
+    startDate: Date;
+    endDate: Date;
   };
+  team: {
+    id: string;
+    name: string;
+    avatar: string;
+  }[];
 }
 
 interface ProjectFilters {
@@ -29,16 +32,12 @@ export const useProjects = (filters: ProjectFilters) => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const response = await axios.get('/api/projects', {
-          params: {
-            status: filters.status || undefined,
-            skills: filters.skills.length ? filters.skills : undefined,
-            search: filters.search || undefined
-          }
-        });
+        setIsLoading(true);
+        const response = await axios.get('/api/projects', { params: filters });
         setProjects(response.data);
+        setError(null);
       } catch (err) {
-        setError(err as Error);
+        setError(err instanceof Error ? err : new Error('Failed to fetch projects'));
       } finally {
         setIsLoading(false);
       }

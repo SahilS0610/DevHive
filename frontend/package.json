@@ -3,12 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
-    "start": "react-scripts start",
-    "lint": "next lint",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",
@@ -16,13 +14,12 @@
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
     "axios": "^1.6.7",
+    "next": "^14.1.0",
     "react": "^18.2.0",
     "react-datepicker": "^4.25.0",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.50.1",
     "react-multi-select-component": "^4.3.4",
-    "react-router-dom": "^6.22.1",
-    "react-scripts": "5.0.1",
     "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3",
     "zod": "^3.22.4"
@@ -31,9 +28,10 @@
     "@types/react-datepicker": "^4.19.4",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",
-    "eslint": "^9",
-    "eslint-config-next": "15.3.0",
-    "@eslint/eslintrc": "^3"
+    "eslint": "^8.56.0",
+    "eslint-config-next": "14.1.0",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0"
   },
   "eslintConfig": {
     "extends": [

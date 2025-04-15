@@ -3,59 +3,54 @@ import { Redis } from 'ioredis';
 import { EmailService } from './email.service';
 import { NotificationType, NotificationPayload, WebSocketMessage } from '../types/notification.types';
 import { logger } from '../utils/logger';
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Notification } from '../entities/Notification';
+import { User } from '../entities/User';
+import { WebSocketGateway } from '../websocket/websocket.gateway';
 
+@Injectable()
 export class NotificationService {
   private connections: Map<string, WebSocket> = new Map();
   private redis: Redis;
   private emailService: EmailService;
 
-  constructor() {
+  constructor(
+    @InjectRepository(Notification)
+    private notificationRepository: Repository<Notification>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    private wsGateway: WebSocketGateway
+  ) {
     this.redis = new Redis(process.env.REDIS_URL);
     this.emailService = new EmailService();
   }
 
   async createNotification(
     userId: string,
-    notification: Omit<NotificationPayload, 'id' | 'createdAt' | 'isRead'>
-  ): Promise<NotificationPayload> {
-    const notificationId = crypto.randomUUID();
-    const payload: NotificationPayload = {
-      ...notification,
-      id: notificationId,
-      isRead: false,
-      createdAt: new Date(),
-      userId
-    };
+    type: string,
+    content: string,
+    metadata?: any
+  ): Promise<Notification> {
+    const user = await this.userRepository.findOneOrFail({
+      where: { id: userId }
+    });
 
-    try {
-      // Store in Redis with TTL of 30 days
-      await this.redis.set(
-        `notifications:${userId}:${notificationId}`,
-        JSON.stringify(payload),
-        'EX',
-        60 * 60 * 24 * 30
-      );
+    const notification = this.notificationRepository.create({
+      user,
+      type,
+      content,
+      metadata,
+      read: false
+    });
 
-      // Add to user's notification list
-      await this.redis.lpush(
-        `notifications:${userId}`,
-        notificationId
-      );
+    const savedNotification = await this.notificationRepository.save(notification);
 
-      // Send real-time notification
-      this.sendWebSocketNotification(userId, payload);
+    // Send real-time notification
+    this.wsGateway.sendNotification(userId, savedNotification);
 
-      // Send email for important notifications
-      if (this.shouldSendEmail(notification.type)) {
-        await this.emailService.sendNotificationEmail(userId, payload);
-      }
-
-      logger.info(`Notification created for user ${userId}: ${notification.type}`);
-      return payload;
-    } catch (error) {
-      logger.error('Error creating notification:', error);
-      throw error;
-    }
+    return savedNotification;
   }
 
   private shouldSendEmail(type: NotificationType): boolean {
@@ -86,39 +81,21 @@ export class NotificationService {
     logger.info(`WebSocket connection removed for user ${userId}`);
   }
 
-  public async getUserNotifications(userId: string): Promise<NotificationPayload[]> {
-    try {
-      const notificationIds = await this.redis.lrange(`notifications:${userId}`, 0, -1);
-      const notifications: NotificationPayload[] = [];
-
-      for (const id of notificationIds) {
-        const notification = await this.redis.get(`notifications:${userId}:${id}`);
-        if (notification) {
-          notifications.push(JSON.parse(notification));
-        }
-      }
-
-      return notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-    } catch (error) {
-      logger.error('Error fetching user notifications:', error);
-      throw error;
-    }
+  public async getUserNotifications(userId: string): Promise<Notification[]> {
+    return this.notificationRepository.find({
+      where: { user: { id: userId } },
+      order: { createdAt: 'DESC' }
+    });
   }
 
-  public async markAsRead(userId: string, notificationId: string): Promise<void> {
-    try {
-      const notification = await this.redis.get(`notifications:${userId}:${notificationId}`);
-      if (notification) {
-        const payload: NotificationPayload = JSON.parse(notification);
-        payload.isRead = true;
-        await this.redis.set(
-          `notifications:${userId}:${notificationId}`,
-          JSON.stringify(payload)
-        );
-      }
-    } catch (error) {
-      logger.error('Error marking notification as read:', error);
-      throw error;
-    }
+  async markAsRead(notificationId: string): Promise<Notification> {
+    const notification = await this.notificationRepository.findOneOrFail({
+      where: { id: notificationId }
+    });
+
+    notification.read = true;
+    notification.readAt = new Date();
+
+    return this.notificationRepository.save(notification);
   }
 } 

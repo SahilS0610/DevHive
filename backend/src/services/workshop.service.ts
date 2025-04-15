@@ -1,11 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Workshop } from '../entities/Workshop';
 import { WorkshopRegistration } from '../entities/WorkshopRegistration';
 import { WorkshopResource } from '../entities/WorkshopResource';
 import { CreateWorkshopDTO, UpdateWorkshopDTO, CreateResourceDTO, TrackAttendanceDTO } from '../dto/workshop.dto';
 import { WorkshopStatus, RegistrationStatus } from '../entities/WorkshopRegistration';
+import { User } from '../entities/User';
 
 @Injectable()
 export class WorkshopService {
@@ -16,13 +17,20 @@ export class WorkshopService {
     private registrationRepository: Repository<WorkshopRegistration>,
     @InjectRepository(WorkshopResource)
     private resourceRepository: Repository<WorkshopResource>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>
   ) {}
 
-  async createWorkshop(dto: CreateWorkshopDTO): Promise<Workshop> {
+  async createWorkshop(dto: CreateWorkshopDTO, organizerId: string): Promise<Workshop> {
+    const organizer = await this.userRepository.findOneOrFail({ where: { id: organizerId } });
+    
     const workshop = this.workshopRepository.create({
       ...dto,
-      status: WorkshopStatus.DRAFT,
+      organizer,
+      registeredParticipants: 0,
+      status: 'UPCOMING'
     });
+
     return this.workshopRepository.save(workshop);
   }
 
@@ -134,5 +142,36 @@ export class WorkshopService {
       averageAttendance: totalPossibleAttendance > 0 ? (actualAttendance / totalPossibleAttendance) * 100 : 0,
       completionRate: totalRegistrations > 0 ? (completedRegistrations / totalRegistrations) * 100 : 0,
     };
+  }
+
+  async getUpcomingWorkshops(): Promise<Workshop[]> {
+    return this.workshopRepository.find({
+      where: {
+        date: MoreThan(new Date()),
+        status: 'UPCOMING'
+      },
+      order: {
+        date: 'ASC'
+      }
+    });
+  }
+
+  async registerParticipant(workshopId: string, userId: string): Promise<Workshop> {
+    const workshop = await this.workshopRepository.findOneOrFail({
+      where: { id: workshopId }
+    });
+
+    if (workshop.registeredParticipants >= workshop.maxParticipants) {
+      throw new Error('Workshop is full');
+    }
+
+    const user = await this.userRepository.findOneOrFail({
+      where: { id: userId }
+    });
+
+    workshop.participants = [...workshop.participants, user];
+    workshop.registeredParticipants += 1;
+
+    return this.workshopRepository.save(workshop);
   }
 } 
